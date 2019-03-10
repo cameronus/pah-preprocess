@@ -8,10 +8,10 @@ import xmltodict
 import numpy as np
 import json
 
-default_db = 'pahdb/pahdb-theoretical-3.0.xml'
+DEFAULT_DB = 'pahdb/pahdb-theoretical-3.0.xml'
 
 @click.command()
-@click.option('--input', '-i', default=default_db, help='PAHdb XML input filename.')
+@click.option('--input', '-i', default=DEFAULT_DB, help='PAHdb XML input filename.')
 @click.option('--output', '-o', default=None, help='Parsed PAHdb output filename.')
 @click.option('--blacklist', '-b', multiple=True, help='Blacklisted UIDs.')
 def parse_db(input, output, blacklist):
