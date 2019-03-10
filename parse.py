@@ -41,7 +41,7 @@ def parse_db(input, output, blacklist):
             if intensity == 0.0:
                 continue
             wavenumber = np.float(transition['frequency']) if db_type == 'experimental' else np.float(transition['frequency']['#text'])
-            molecule['transitions'].append([wavenumber, intensity])
+            molecule['transitions'].append([wavenumber, intensity, 1.0 if db_type == 'experimental' else np.float(transition['frequency']['@scale'])])
         molecule_data.append(molecule)
     json_string = json.dumps({
         'version': db['pahdatabase']['@version'],

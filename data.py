@@ -39,7 +39,7 @@ def generate_dataset(input, num_species, mix_size, num_training, num_testing, wa
         db = json.loads(file.read())
     uids = db['uids'][:num_species]
     data = db['data'][:num_species]
-    get_bounds = lambda part: [transition[part] for molecule in molecule_data for transition in molecule['transitions']]
+    get_bounds = lambda part: [transition[part] for molecule in data for transition in molecule['transitions']]
     stats = {
         'wavenumber_max': max(get_bounds(0)),
         'wavenumber_min': min(get_bounds(0)),
@@ -47,7 +47,8 @@ def generate_dataset(input, num_species, mix_size, num_training, num_testing, wa
         'intensity_min': min(get_bounds(1)),
     }
 
-    # print(data)
+    print(data)
+    print(stats)
 
 if __name__ == '__main__':
     generate_dataset()
