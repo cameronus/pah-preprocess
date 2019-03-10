@@ -7,6 +7,7 @@ import click
 import xmltodict
 import numpy as np
 import json
+import os
 
 DEFAULT_DB = 'pahdb/pahdb-theoretical-3.0.xml'
 
@@ -55,6 +56,8 @@ def parse_db(input, output, blacklist):
         'uids': [molecule['uid'] for molecule in molecule_data],
         'data': molecule_data
     }, separators=(',', ':'))
+    if not os.path.exists('pahdb') and output is None:
+        os.makedirs('pahdbtest')
     output = open(out, 'w')
     output.write(json_string)
     print('Outputted', str(len(molecule_data)), 'molecules.')
