@@ -113,5 +113,5 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# PAHdb directory
-pahdb
+# Parsed PAHdb directory and files
+pahdb*

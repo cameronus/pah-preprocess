@@ -31,15 +31,22 @@ POI = ()
 @click.option('--poi', default=POI, type=(float, float), multiple=True, help='Points of interest and their width in cm^-1.')
 def generate_dataset(input, num_species, mix_size, num_training, num_testing, wave_sigma, int_sigma, fwhm, poi):
     now = datetime.datetime.now().strftime('%Y-%m-%d_%I-%M%p')
-    filename = f'training_n{num_species}-m{mix_size}-p{len(poi)}_{now}.npy'
+    filename = f'_n{num_species}-m{mix_size}-p{len(poi)}_{now}.npy'
     print('Input file:', input)
     print('Points of Interest: [', ', '.join(map(str, poi)), ']')
     print('Importing PAHdb.')
-    print(now)
-    print(filename)
-
     with open(input) as file:
-        data = json.loads(file.read())
+        db = json.loads(file.read())
+    uids = db['uids'][:num_species]
+    data = db['data'][:num_species]
+    get_bounds = lambda part: [transition[part] for molecule in molecule_data for transition in molecule['transitions']]
+    stats = {
+        'wavenumber_max': max(get_bounds(0)),
+        'wavenumber_min': min(get_bounds(0)),
+        'intensity_max': max(get_bounds(1)),
+        'intensity_min': min(get_bounds(1)),
+    }
+
     # print(data)
 
 if __name__ == '__main__':
@@ -51,21 +58,34 @@ num species: 100
 poi: (200, 10) (1000, 10) (800, 40)
 5 training
 1 testing
+(equal concentrations, boolean species detection returned from CNN)
 
 outputted files:
 training_n100-m2-p3_2019-03-09_11-21PM.npy =>
 [
     [
-        [ poi 1 from molecule 1], # all poi 1 are same length
-        []
+        [
+            [ sample 1 of poi 1 from molecule 1 ], # all poi 1 are same length
+            [ uids in sample 1 ]
+        ],
+        [
+            [ sample 2 of poi 1 from molecule 1 ],
+            [ uids in sample 2 ]
+        ]
     ],
     [
-        [ poi 2 from molecule 2 ] # all poi 2 are same length
+
     ],
  []  # poi 3
 ]
 
 testing_n100-m2-p3_2019-03-09_11-21PM.npy =>
 
+'stats': {
+    'wavenumber_max': max(get_bounds(0)),
+    'wavenumber_min': min(get_bounds(0)),
+    'intensity_max': max(get_bounds(1)),
+    'intensity_min': min(get_bounds(1)),
+},
 
 """
