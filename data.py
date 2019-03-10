@@ -43,8 +43,6 @@ def generate_dataset(input, num_species, mix_size, num_training, num_testing, wa
         db = json.loads(file.read())
     uids = db['uids'][:num_species]
     data = db['data'][:num_species]
-    # print(stat.mean([transition[1] for molecule in data for transition in molecule['transitions']]))
-    # print(stat.stdev([transition[1] for molecule in data for transition in molecule['transitions']]))
     get_bounds = lambda part: [transition[part] for molecule in data for transition in molecule['transitions']]
     stats = {
         'wavenumber_max': max(get_bounds(0)),

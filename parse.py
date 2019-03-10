@@ -8,6 +8,7 @@ import xmltodict
 import numpy as np
 import json
 import os
+import statistics as stat
 
 DEFAULT_DB = 'pahdb-theoretical-3.0.xml'
 CUTOFF = 1000.0
@@ -61,7 +62,23 @@ def parse_db(input, output, blacklist, cutoff):
         os.makedirs('pahdb')
     output = open(out, 'w')
     output.write(json_string)
-    print(cut, 'cut from data (intensity > %f).' % cutoff)
+    print()
+    print('Stats:')
+    wavenumbers_pre = [transition[0] for molecule in molecule_data for transition in molecule['transitions']]
+    wavenumbers = [transition[0] * transition[2] for molecule in molecule_data for transition in molecule['transitions']]
+    intensities = [transition[1] for molecule in molecule_data for transition in molecule['transitions']]
+    print()
+    print('Pre-scale Wavenumber Max:', max(wavenumbers_pre))
+    print('Pre-scale Wavenumber Min:', min(wavenumbers_pre))
+    print('Wavenumber Max:', max(wavenumbers))
+    print('Wavenumber Min:', min(wavenumbers))
+    print()
+    print('Intensity Mean:', stat.mean(intensities))
+    print('Intensity Standard Deviation:', stat.stdev(intensities))
+    print('Intensity Max:', max(intensities))
+    print('Intensity Min:', min(intensities))
+    print()
+    print(cut, 'cut from data (with intensity > %f).' % cutoff)
     print('Outputted', str(len(molecule_data)), 'molecules from', len(species), 'initial.')
 
 if __name__ == '__main__':
