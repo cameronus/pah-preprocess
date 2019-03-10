@@ -13,17 +13,21 @@ import random
 import statistics as stat
 
 DEFAULT_DB = 'pahdb/pahdb-theoretical.json'
-NUM_SPECIES = 1000
-MIX_SIZE = 3
-NUM_TRAINING = 800
-NUM_TESTING = 200
-WAVE_SIGMA = 7.5
-INT_SIGMA = 0.2
+CUTOFF = 1000.0 # Max allowable intensity
+BLACKLIST = () # Blacklisted UIDs
+NUM_SPECIES = 1000 # Use the first NUM_SPECIES molecules to generate the dataset
+MIX_SIZE = 3 # Number of molecules to include in each synthetic mixture
+NUM_TRAINING = 800 # Number of training samples
+NUM_TESTING = 200 # Number of testing samples
+WAVE_SIGMA = 7.5 # Standard deviation of wavenumber noise
+INT_SIGMA = 0.2 # Standard deviation of intensity noise
 FWHM = 63.69 # 15cm^-1
-POI = ()
+POI = () # Points of interest
 
 @click.command()
 @click.option('--input', '-i', default=DEFAULT_DB, help='PAHdb JSON input filename.')
+@click.option('--cutoff', default=CUTOFF, help='Max intensity value to be allowed in data.')
+@click.option('--blacklist', '-b', default=BLACKLIST, type=int, multiple=True, help='Blacklisted UIDs.')
 @click.option('--num_species', default=NUM_SPECIES, help='The number of PAH species used out of the total to create the datasets.')
 @click.option('--mix_size', default=MIX_SIZE, help='The number of PAH species in each mixture.')
 @click.option('--num_training', default=NUM_TRAINING, help='Number of training samples.')
@@ -31,18 +35,44 @@ POI = ()
 @click.option('--wave_sigma', default=WAVE_SIGMA, help='Standard deviation for wavenumber noise.')
 @click.option('--int_sigma', default=INT_SIGMA, help='Standard deviation for intensity noise.')
 @click.option('--fwhm', default=FWHM, help='Full width half maximum for convolution.')
-@click.option('--poi', default=POI, type=(float, float), multiple=True, help='Points of interest and their width in cm^-1.')
-@click.option('--scaled', is_flag=True, help='Apply the scaling factor to all the wavenumbers.')
-def generate_dataset(input, num_species, mix_size, num_training, num_testing, wave_sigma, int_sigma, fwhm, poi, scaled):
+@click.option('--poi', '-p', default=POI, type=(float, float), multiple=True, help='Points of interest and their width in cm^-1.')
+@click.option('--no_scale', is_flag=True, help='Do not apply the scaling factor to all wavenumbers.')
+def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_training, num_testing, wave_sigma, int_sigma, fwhm, poi, no_scale):
     now = datetime.datetime.now().strftime('%Y-%m-%d_%I-%M%p')
     filename = f'_n{num_species}-m{mix_size}-p{len(poi)}_{now}.npy'
+
+    # Print out dataset configuration
     print('Input file:', input)
-    print('Points of Interest: [', ', '.join(map(str, poi)), ']')
+    print('Intensity Cutoff:', cutoff)
+    print('Blacklisted UIDs: [', ', '.join(map(str, blacklist)) if len(blacklist) > 0 else 'none', ']')
+    print('Points of Interest: [', ', '.join(map(str, poi)) if len(poi) > 0 else 'none', ']')
+    if len(poi) == 0:
+        print('No POIs. Exiting.')
+        return
     print('Importing PAHdb.')
+
+    # Open and parse PAHdb JSON file
     with open(input) as file:
         db = json.loads(file.read())
-    uids = db['uids'][:num_species]
-    data = db['data'][:num_species]
+    data = db['data']
+
+    # Filter out all blacklisted UIDs
+    data = list(filter(lambda x: x['uid'] not in blacklist, data))
+
+    # Filter out molecules with intensities above the cutoff, scale wavenumber, and hide scaling factor
+    for molecule in data:
+        for transition in molecule['transitions']:
+            if transition[1] > cutoff:
+                data.remove(molecule)
+                break
+            if not no_scale:
+                transition[0] *= transition[2]
+                del transition[2]
+
+    # Get first num_species molecules from data
+    data = data[:num_species]
+
+    # Calculate bounds
     get_bounds = lambda part: [transition[part] for molecule in data for transition in molecule['transitions']]
     stats = {
         'wavenumber_max': max(get_bounds(0)),
@@ -50,8 +80,8 @@ def generate_dataset(input, num_species, mix_size, num_training, num_testing, wa
         'intensity_max': max(get_bounds(1)),
         'intensity_min': min(get_bounds(1)),
     }
-    # print(data)
     print(stats)
+
     for i in range(1): # num_training + num_testing
         # print(i)
         # if i < num_training:
@@ -62,21 +92,24 @@ def generate_dataset(input, num_species, mix_size, num_training, num_testing, wa
         species_uids = [molecule['uid'] for molecule in species]
 
         for molecule in species:
-            print(molecule['uid'])
+            # print(molecule['uid'])
             transitions = molecule['transitions']
-            wavenumbers = [transition[0] * transition[2] if scaled else transition[0] for transition in transitions]
+            wavenumbers = [transition[0] for transition in transitions]
             intensities = [transition[1] for transition in transitions]
             # add noise
             wavenumbers = np.around(wavenumbers, decimals=1)
             print(wavenumbers)
             print(intensities)
+
+            data_matrix_training = np.zeros((num_sets * num_training_molecules, VECTOR_SIZE+1), dtype=np.float32)
+
             # plt.hist(intensities)
             # return
 
 
         # pick mix_size randomly from num_species #
         # get UIDs #
-        # if scaled, scale wavenumbers #
+        # if not no_scale, scale wavenumbers #
         # add noise
         # merge transitions
         # convolve
