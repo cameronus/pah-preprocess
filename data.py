@@ -7,11 +7,14 @@ import click
 import json
 import numpy as np
 import scipy as scipy
+import matplotlib.pyplot as plt
 import datetime
+import random
+import statistics as stat
 
 DEFAULT_DB = 'pahdb/pahdb-theoretical.json'
 NUM_SPECIES = 1000
-MIX_SIZE = 10
+MIX_SIZE = 3
 NUM_TRAINING = 800
 NUM_TESTING = 200
 WAVE_SIGMA = 7.5
@@ -29,7 +32,8 @@ POI = ()
 @click.option('--int_sigma', default=INT_SIGMA, help='Standard deviation for intensity noise.')
 @click.option('--fwhm', default=FWHM, help='Full width half maximum for convolution.')
 @click.option('--poi', default=POI, type=(float, float), multiple=True, help='Points of interest and their width in cm^-1.')
-def generate_dataset(input, num_species, mix_size, num_training, num_testing, wave_sigma, int_sigma, fwhm, poi):
+@click.option('--scaled', is_flag=True, help='Apply the scaling factor to all the wavenumbers.')
+def generate_dataset(input, num_species, mix_size, num_training, num_testing, wave_sigma, int_sigma, fwhm, poi, scaled):
     now = datetime.datetime.now().strftime('%Y-%m-%d_%I-%M%p')
     filename = f'_n{num_species}-m{mix_size}-p{len(poi)}_{now}.npy'
     print('Input file:', input)
@@ -39,6 +43,8 @@ def generate_dataset(input, num_species, mix_size, num_training, num_testing, wa
         db = json.loads(file.read())
     uids = db['uids'][:num_species]
     data = db['data'][:num_species]
+    # print(stat.mean([transition[1] for molecule in data for transition in molecule['transitions']]))
+    # print(stat.stdev([transition[1] for molecule in data for transition in molecule['transitions']]))
     get_bounds = lambda part: [transition[part] for molecule in data for transition in molecule['transitions']]
     stats = {
         'wavenumber_max': max(get_bounds(0)),
@@ -46,17 +52,33 @@ def generate_dataset(input, num_species, mix_size, num_training, num_testing, wa
         'intensity_max': max(get_bounds(1)),
         'intensity_min': min(get_bounds(1)),
     }
-    print(data)
+    # print(data)
     print(stats)
-    for i in range(num_training + num_testing):
-        print(i)
-        if i < num_training:
-            print('train')
-        else:
-            print('test')
-            
-        # pick mix_size randomly from num_species
-        # get UIDs
+    for i in range(1): # num_training + num_testing
+        # print(i)
+        # if i < num_training:
+        #     print('train')
+        # else:
+        #     print('test')
+        species = np.random.choice(data, mix_size, replace=False)
+        species_uids = [molecule['uid'] for molecule in species]
+
+        for molecule in species:
+            print(molecule['uid'])
+            transitions = molecule['transitions']
+            wavenumbers = [transition[0] * transition[2] if scaled else transition[0] for transition in transitions]
+            intensities = [transition[1] for transition in transitions]
+            # add noise
+            wavenumbers = np.around(wavenumbers, decimals=1)
+            print(wavenumbers)
+            print(intensities)
+            # plt.hist(intensities)
+            # return
+
+
+        # pick mix_size randomly from num_species #
+        # get UIDs #
+        # if scaled, scale wavenumbers #
         # add noise
         # merge transitions
         # convolve
