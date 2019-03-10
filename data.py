@@ -12,8 +12,8 @@ import datetime
 DEFAULT_DB = 'pahdb/pahdb-theoretical.json'
 NUM_SPECIES = 1000
 MIX_SIZE = 10
-NUM_TRAINING = 10000
-NUM_TESTING = 1000
+NUM_TRAINING = 800
+NUM_TESTING = 200
 WAVE_SIGMA = 7.5
 INT_SIGMA = 0.2
 FWHM = 63.69 # 15cm^-1
@@ -46,9 +46,22 @@ def generate_dataset(input, num_species, mix_size, num_training, num_testing, wa
         'intensity_max': max(get_bounds(1)),
         'intensity_min': min(get_bounds(1)),
     }
-
     print(data)
     print(stats)
+    for i in range(num_training + num_testing):
+        print(i)
+        if i < num_training:
+            print('train')
+        else:
+            print('test')
+            
+        # pick mix_size randomly from num_species
+        # get UIDs
+        # add noise
+        # merge transitions
+        # convolve
+        # split into POIs
+        # add data to np array and save
 
 if __name__ == '__main__':
     generate_dataset()
@@ -81,12 +94,4 @@ training_n100-m2-p3_2019-03-09_11-21PM.npy =>
 ]
 
 testing_n100-m2-p3_2019-03-09_11-21PM.npy =>
-
-'stats': {
-    'wavenumber_max': max(get_bounds(0)),
-    'wavenumber_min': min(get_bounds(0)),
-    'intensity_max': max(get_bounds(1)),
-    'intensity_min': min(get_bounds(1)),
-},
-
 """
