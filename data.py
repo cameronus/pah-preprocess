@@ -6,21 +6,21 @@ Cameron Jones, 2019
 import click
 import json
 import numpy as np
-import scipy as scipy
+import scipy.ndimage
 import matplotlib.pyplot as plt
 import datetime
 import random
 import math
 
 DEFAULT_DB = 'pahdb/pahdb-theoretical.json'
-CUTOFF = 1000.0 # Max allowable intensity
+CUTOFF = 100.0 # Max allowable intensity
 BLACKLIST = () # Blacklisted UIDs
 NUM_SPECIES = 1000 # Use the first NUM_SPECIES molecules to generate the dataset
 MIX_SIZE = 3 # Number of molecules to include in each synthetic mixture
 NUM_TRAINING = 800 # Number of training samples
 NUM_TESTING = 200 # Number of testing samples
-WAVE_SIGMA = 0#7.5 # Standard deviation of wavenumber noise
-INT_SIGMA = 0#0.2 # Standard deviation of intensity noise
+WAVE_SIGMA = 7.5 # Standard deviation of wavenumber noise
+INT_SIGMA = 0.2 # Standard deviation of intensity noise
 FWHM = 63.69 # 15cm^-1
 POI = () # Points of interest
 
@@ -56,22 +56,26 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
         db = json.loads(file.read())
     uids = db['uids']
     data = db['data']
+    print(len(data), 'initial molecules.')
 
     # Filter out all blacklisted UIDs
     data = list(filter(lambda x: x['uid'] not in blacklist, data))
+    print(len(data), 'molecules after blacklisting.')
 
-    # Filter out molecules with intensities above the cutoff, scale wavenumber, and hide scaling factor
-    for molecule in data:
+    # Filter out molecules with intensities above the cutoff
+    data = list(filter(lambda molecule: all([transition[1] <= cutoff for transition in molecule['transitions']]), data))
+    print(len(data), 'molecules after filtering.')
+
+    # Scale wavenumber, and hide scaling factor
+    for index, molecule in enumerate(data):
         for transition in molecule['transitions']:
-            if transition[1] > cutoff:
-                data.remove(molecule)
-                break
             if not no_scale:
                 transition[0] *= transition[2]
                 del transition[2]
 
     # Get first num_species molecules from data
     data = data[:num_species]
+    print(len(data), 'molecules after slicing.')
 
     # Calculate bounds
     get_bounds = lambda part: [transition[part] for molecule in data for transition in molecule['transitions']]
@@ -81,6 +85,7 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
         'intensity_max': max(get_bounds(1)),
         'intensity_min': min(get_bounds(1)),
     }
+    vector_size = math.ceil(stats['wavenumber_max']) * 10
     print(stats)
 
     poi_length = sum([region[1] * 2 for region in poi])
@@ -96,24 +101,31 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
         index = i if i < num_training else i - num_training
 
         species = np.random.choice(data, mix_size, replace=False)
+        spectrum = np.zeros((vector_size), dtype=np.float32)
+        print(max([transition[1] for transition in molecule['transitions'] for molecule in species]))
 
         for molecule in species:
             uid = molecule['uid']
             for transition in molecule['transitions']:
                 wavenumber = int(round(np.random.normal(0, wave_sigma) + transition[0], 1) * 10)
                 intensity = (np.random.normal(0, int_sigma) + 1) * transition[1]
-                training_x[index][wavenumber] = intensity / stats['intensity_max']
-                print(transition[0], transition[1])
-                print(wavenumber, intensity)
-                print()
+                print(transition[1], intensity, stats['intensity_max'], intensity/stats['intensity_max'])
+                spectrum[wavenumber] += intensity / stats['intensity_max']
+                # training_x[index][wavenumber] = intensity / stats['intensity_max']
+                # print(transition[0], transition[1])
+                # print(wavenumber, intensity)
             training_y[index][uids.index(uid)] = 1.0
+        spectrum = scipy.ndimage.filters.gaussian_filter1d(spectrum, fwhm).astype(np.float16)
+        # spectrum *= 1.0/spectrum.max()
+        print(max(spectrum))
+        # print(spectrum)
 
         if i < num_training:
-            print('train')
             print(i)
+            print('train')
         else:
-            print('test')
             print(i - num_training)
+            print('test')
         print()
 
 
