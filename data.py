@@ -10,7 +10,7 @@ import scipy as scipy
 import matplotlib.pyplot as plt
 import datetime
 import random
-import statistics as stat
+import math
 
 DEFAULT_DB = 'pahdb/pahdb-theoretical.json'
 CUTOFF = 1000.0 # Max allowable intensity
@@ -19,8 +19,8 @@ NUM_SPECIES = 1000 # Use the first NUM_SPECIES molecules to generate the dataset
 MIX_SIZE = 3 # Number of molecules to include in each synthetic mixture
 NUM_TRAINING = 800 # Number of training samples
 NUM_TESTING = 200 # Number of testing samples
-WAVE_SIGMA = 7.5 # Standard deviation of wavenumber noise
-INT_SIGMA = 0.2 # Standard deviation of intensity noise
+WAVE_SIGMA = 0#7.5 # Standard deviation of wavenumber noise
+INT_SIGMA = 0#0.2 # Standard deviation of intensity noise
 FWHM = 63.69 # 15cm^-1
 POI = () # Points of interest
 
@@ -35,7 +35,7 @@ POI = () # Points of interest
 @click.option('--wave_sigma', default=WAVE_SIGMA, help='Standard deviation for wavenumber noise.')
 @click.option('--int_sigma', default=INT_SIGMA, help='Standard deviation for intensity noise.')
 @click.option('--fwhm', default=FWHM, help='Full width half maximum for convolution.')
-@click.option('--poi', '-p', default=POI, type=(float, float), multiple=True, help='Points of interest and their width in cm^-1.')
+@click.option('--poi', '-p', default=POI, type=(int, int), multiple=True, help='Points of interest and their width in cm^-1.')
 @click.option('--no_scale', is_flag=True, help='Do not apply the scaling factor to all wavenumbers.')
 def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_training, num_testing, wave_sigma, int_sigma, fwhm, poi, no_scale):
     now = datetime.datetime.now().strftime('%Y-%m-%d_%I-%M%p')
@@ -54,6 +54,7 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
     # Open and parse PAHdb JSON file
     with open(input) as file:
         db = json.loads(file.read())
+    uids = db['uids']
     data = db['data']
 
     # Filter out all blacklisted UIDs
@@ -82,35 +83,44 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
     }
     print(stats)
 
-    for i in range(1): # num_training + num_testing
-        # print(i)
-        # if i < num_training:
-        #     print('train')
-        # else:
-        #     print('test')
+    poi_length = sum([region[1] * 2 for region in poi])
+    buffer = 0
+    print(poi_length)
+
+    training_x = np.zeros((num_training, poi_length + buffer), dtype=np.float32)
+    training_y = np.zeros((num_training, len(uids)), dtype=np.float32)
+    testing_x = np.zeros((num_testing, poi_length + buffer), dtype=np.float32)
+    testing_y = np.zeros((num_testing, len(uids)), dtype=np.float32)
+
+    for i in range(num_training + num_testing):
+        index = i if i < num_training else i - num_training
+
         species = np.random.choice(data, mix_size, replace=False)
-        species_uids = [molecule['uid'] for molecule in species]
 
         for molecule in species:
-            # print(molecule['uid'])
-            transitions = molecule['transitions']
-            wavenumbers = [transition[0] for transition in transitions]
-            intensities = [transition[1] for transition in transitions]
-            # add noise
-            wavenumbers = np.around(wavenumbers, decimals=1)
-            print(wavenumbers)
-            print(intensities)
+            uid = molecule['uid']
+            for transition in molecule['transitions']:
+                wavenumber = int(round(np.random.normal(0, wave_sigma) + transition[0], 1) * 10)
+                intensity = (np.random.normal(0, int_sigma) + 1) * transition[1]
+                training_x[index][wavenumber] = intensity / stats['intensity_max']
+                print(transition[0], transition[1])
+                print(wavenumber, intensity)
+                print()
+            training_y[index][uids.index(uid)] = 1.0
 
-            data_matrix_training = np.zeros((num_sets * num_training_molecules, VECTOR_SIZE+1), dtype=np.float32)
-
-            # plt.hist(intensities)
-            # return
+        if i < num_training:
+            print('train')
+            print(i)
+        else:
+            print('test')
+            print(i - num_training)
+        print()
 
 
         # pick mix_size randomly from num_species #
         # get UIDs #
         # if not no_scale, scale wavenumbers #
-        # add noise
+        # add noise #
         # merge transitions
         # convolve
         # split into POIs
@@ -129,6 +139,7 @@ poi: (200, 10) (1000, 10) (800, 40)
 
 outputted files:
 training_n100-m2-p3_2019-03-09_11-21PM.npy =>
+# setup 1
 [
     [
         [
@@ -144,6 +155,20 @@ training_n100-m2-p3_2019-03-09_11-21PM.npy =>
 
     ],
  []  # poi 3
+]
+
+# setup 2
+[
+    [
+        [ sample 1 of poi 1 ], # all poi 1 are same length
+        [ sample 2 of poi 1 ]
+    ],
+    [
+
+    ],
+    [
+
+    ]
 ]
 
 testing_n100-m2-p3_2019-03-09_11-21PM.npy =>
