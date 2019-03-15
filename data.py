@@ -6,7 +6,7 @@ Cameron Jones, 2019
 import click
 import json
 import numpy as np
-import scipy.ndimage
+import scipy.signal
 import matplotlib.pyplot as plt
 import datetime
 import random
@@ -85,16 +85,17 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
         'intensity_max': max(get_bounds(1)),
         'intensity_min': min(get_bounds(1)),
     }
-    vector_size = math.ceil(stats['wavenumber_max']) * 10
+    # vector_size = math.ceil(stats['wavenumber_max']) * 10
+    vector_size = 5400 * 10
     print(stats)
 
-    poi_length = sum([region[1] * 2 for region in poi])
+    poi_length = sum([region[1] * 2 for region in poi]) * 10
     buffer = 0
     print(poi_length)
 
-    training_x = np.zeros((num_training, poi_length + buffer), dtype=np.float32)
+    training_x = np.zeros((num_training, poi_length + buffer * (len(poi) - 1)), dtype=np.float32)
     training_y = np.zeros((num_training, len(uids)), dtype=np.float32)
-    testing_x = np.zeros((num_testing, poi_length + buffer), dtype=np.float32)
+    testing_x = np.zeros((num_testing, poi_length + buffer * (len(poi) - 1)), dtype=np.float32)
     testing_y = np.zeros((num_testing, len(uids)), dtype=np.float32)
 
     for i in range(num_training + num_testing):
@@ -102,30 +103,50 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
 
         species = np.random.choice(data, mix_size, replace=False)
         spectrum = np.zeros((vector_size), dtype=np.float32)
-        print(max([transition[1] for transition in molecule['transitions'] for molecule in species]))
+        # print(max([transition[1] for transition in molecule['transitions'] for molecule in species]))
 
         for molecule in species:
             uid = molecule['uid']
             for transition in molecule['transitions']:
                 wavenumber = int(round(np.random.normal(0, wave_sigma) + transition[0], 1) * 10)
                 intensity = (np.random.normal(0, int_sigma) + 1) * transition[1]
-                print(transition[1], intensity, stats['intensity_max'], intensity/stats['intensity_max'])
                 spectrum[wavenumber] += intensity / stats['intensity_max']
-                # training_x[index][wavenumber] = intensity / stats['intensity_max']
-                # print(transition[0], transition[1])
-                # print(wavenumber, intensity)
             training_y[index][uids.index(uid)] = 1.0
-        spectrum = scipy.ndimage.filters.gaussian_filter1d(spectrum, fwhm).astype(np.float16)
+
+        count = 0
+        for point in poi:
+            start = (point[0] - point[1]) * 10
+            stop = (point[0] + point[1]) * 10
+            section = spectrum[start:stop]
+            # print(start, 'to', stop)
+            print(len(section))
+            for p_index, s in enumerate(section):
+                training_x[index][count] = s
+                count += 1
+                # print(count)
+                if (s == len(section)):
+                    count += buffer
+
+        print(training_x[index])
+
+            # training_x[index][count] = 0.0
+            # training_x[index][count]
+            # count += 1
+            # if (p_index )
+
+        # spectrum = scipy.ndimage.filters.gaussian_filter1d(spectrum, fwhm).astype(np.float16)
+        # print(max(spectrum))
+        kernel = scipy.signal.gaussian(100, std=fwhm)
+        spectrum = scipy.signal.convolve(spectrum, kernel, mode='same')
         # spectrum *= 1.0/spectrum.max()
-        print(max(spectrum))
+        # print(max(spectrum))
+        # print(kernel)
         # print(spectrum)
 
         if i < num_training:
-            print(i)
-            print('train')
+            print('train', i)
         else:
-            print(i - num_training)
-            print('test')
+            print('test', i - num_training)
         print()
 
 
