@@ -22,6 +22,7 @@ NUM_TESTING = 200 # Number of testing samples
 WAVE_SIGMA = 7.5 # Standard deviation of wavenumber noise
 INT_SIGMA = 0.2 # Standard deviation of intensity noise
 FWHM = 63.69 # 15cm^-1
+RESOLUTION = 0.1
 POI = () # Points of interest
 
 @click.command()
@@ -35,11 +36,14 @@ POI = () # Points of interest
 @click.option('--wave_sigma', default=WAVE_SIGMA, help='Standard deviation for wavenumber noise.')
 @click.option('--int_sigma', default=INT_SIGMA, help='Standard deviation for intensity noise.')
 @click.option('--fwhm', default=FWHM, help='Full width half maximum for convolution.')
+@click.option('--resolution', default=RESOLUTION, help='Resolution of wavenumber values.')
 @click.option('--poi', '-p', default=POI, type=(int, int), multiple=True, help='Points of interest and their width in cm^-1.')
 @click.option('--no_scale', is_flag=True, help='Do not apply the scaling factor to all wavenumbers.')
-def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_training, num_testing, wave_sigma, int_sigma, fwhm, poi, no_scale):
+def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_training, num_testing, wave_sigma, int_sigma, fwhm, resolution, poi, no_scale):
+    # Get date, filename, and resolution multiplier
     now = datetime.datetime.now().strftime('%Y-%m-%d_%I-%M%p')
     filename = f'_n{num_species}-m{mix_size}-p{len(poi)}_{now}.npy'
+    res_multipler = int(1/resolution) if resolution < 1 else 1
 
     # Print out dataset configuration
     print('Input file:', input)
@@ -85,11 +89,13 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
         'intensity_max': max(get_bounds(1)),
         'intensity_min': min(get_bounds(1)),
     }
-    # vector_size = math.ceil(stats['wavenumber_max']) * 10
-    vector_size = 5400 * 10
+
+    # Set vector_size
+    # vector_size = 5400 * res_multipler
+    vector_size = int(stats['wavenumber_max'] * res_multipler)
     print(stats)
 
-    poi_length = sum([region[1] * 2 for region in poi]) * 10
+    poi_length = sum([region[1] * 2 for region in poi]) * res_multipler
     buffer = 0
     print(poi_length)
 
@@ -108,18 +114,31 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
         for molecule in species:
             uid = molecule['uid']
             for transition in molecule['transitions']:
-                wavenumber = int(round(np.random.normal(0, wave_sigma) + transition[0], 1) * 10)
+                wavenumber = int(round(np.random.normal(0, wave_sigma) + transition[0], 1) * res_multipler)
                 intensity = (np.random.normal(0, int_sigma) + 1) * transition[1]
                 spectrum[wavenumber] += intensity / stats['intensity_max']
             training_y[index][uids.index(uid)] = 1.0
 
+        print([uids[i] for i in np.where(training_y[index] == 1.0)[0]])
+
+        plt.plot(spectrum)
+        plt.show()
+
+        # kernel = scipy.signal.gaussian(1001, std=fwhm)
+        # spectrum = scipy.signal.convolve(spectrum, kernel, mode='same')
+
+        spectrum = scipy.ndimage.filters.gaussian_filter1d(spectrum, fwhm).astype(np.float16)
+
+        plt.plot(spectrum)
+        plt.show()
+
         count = 0
         for point in poi:
-            start = (point[0] - point[1]) * 10
-            stop = (point[0] + point[1]) * 10
+            start = max(0, (point[0] - point[1]) * res_multipler)
+            stop = min(len(spectrum) - 1, (point[0] + point[1]) * res_multipler)
             section = spectrum[start:stop]
             # print(start, 'to', stop)
-            print(len(section))
+            # print(len(section))
             for p_index, s in enumerate(section):
                 training_x[index][count] = s
                 count += 1
@@ -127,6 +146,7 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
                 if (s == len(section)):
                     count += buffer
 
+        # print(list(filter(lambda x: x > 0.0, training_x[index])))
         print(training_x[index])
 
             # training_x[index][count] = 0.0
@@ -134,10 +154,18 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
             # count += 1
             # if (p_index )
 
-        # spectrum = scipy.ndimage.filters.gaussian_filter1d(spectrum, fwhm).astype(np.float16)
+        # training_x[index] = scipy.ndimage.filters.gaussian_filter1d(training_x[index], fwhm).astype(np.float16)
         # print(max(spectrum))
-        kernel = scipy.signal.gaussian(100, std=fwhm)
-        spectrum = scipy.signal.convolve(spectrum, kernel, mode='same')
+
+        # kernel = scipy.signal.gaussian(1001, std=fwhm)
+        # print(kernel[0])
+        # training_x[index] = scipy.signal.convolve(training_x[index], kernel, mode='same')
+
+        plt.plot(training_x[index])
+        plt.show()
+        return
+        print(training_x[index])
+        # print(list(filter(lambda x: x > 0.0, training_x[index])))
         # spectrum *= 1.0/spectrum.max()
         # print(max(spectrum))
         # print(kernel)

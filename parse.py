@@ -40,6 +40,7 @@ def parse_db(input, output):
             wavenumber = np.float(transition['frequency']) if db_type == 'experimental' else np.float(transition['frequency']['#text'])
             molecule['transitions'].append([wavenumber, intensity, 1.0 if db_type == 'experimental' else np.float(transition['frequency']['@scale'])])
         molecule_data.append(molecule)
+    molecule_data.sort(key=lambda x: x['uid'])
     json_string = json.dumps({
         'version': db['pahdatabase']['@version'],
         'full': db['pahdatabase']['@full'],
