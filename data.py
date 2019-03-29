@@ -91,14 +91,15 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
     }
 
     # Set vector_size
-    # vector_size = 5400 * res_multipler
     vector_size = int(stats['wavenumber_max'] * res_multipler)
     print(stats)
 
+    # Size of analyzed regions
     poi_length = sum([region[1] * 2 for region in poi]) * res_multipler
     buffer = 0
     print(poi_length)
 
+    # Training/testing data matrices
     training_x = np.zeros((num_training, poi_length + buffer * (len(poi) - 1)), dtype=np.float32)
     training_y = np.zeros((num_training, len(uids)), dtype=np.float32)
     testing_x = np.zeros((num_testing, poi_length + buffer * (len(poi) - 1)), dtype=np.float32)
@@ -109,7 +110,9 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
 
         species = np.random.choice(data, mix_size, replace=False)
         spectrum = np.zeros((vector_size), dtype=np.float32)
-        # print(max([transition[1] for transition in molecule['transitions'] for molecule in species]))
+
+        dataset = np.zeros((poi_length + buffer * (len(poi) - 1)), dtype=np.float32)
+        labels = np.zeros((len(uids)), dtype=np.float32)
 
         for molecule in species:
             uid = molecule['uid']
@@ -117,17 +120,17 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
                 wavenumber = int(round(np.random.normal(0, wave_sigma) + transition[0], 1) * res_multipler)
                 intensity = (np.random.normal(0, int_sigma) + 1) * transition[1]
                 spectrum[wavenumber] += intensity / stats['intensity_max']
-            training_y[index][uids.index(uid)] = 1.0
+            labels[uids.index(uid)] = 1.0
 
-        print([uids[i] for i in np.where(training_y[index] == 1.0)[0]])
+        print([uids[i] for i in np.where(labels == 1.0)[0]])
 
         plt.plot(spectrum)
         plt.show()
 
-        # kernel = scipy.signal.gaussian(1001, std=fwhm)
-        # spectrum = scipy.signal.convolve(spectrum, kernel, mode='same')
+        kernel = scipy.signal.gaussian(1001, std=fwhm)
+        spectrum = scipy.signal.convolve(spectrum, kernel, mode='same')
 
-        spectrum = scipy.ndimage.filters.gaussian_filter1d(spectrum, fwhm).astype(np.float16)
+        # spectrum = scipy.ndimage.filters.gaussian_filter1d(spectrum, fwhm).astype(np.float16)
 
         plt.plot(spectrum)
         plt.show()
@@ -137,22 +140,17 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
             start = max(0, (point[0] - point[1]) * res_multipler)
             stop = min(len(spectrum) - 1, (point[0] + point[1]) * res_multipler)
             section = spectrum[start:stop]
-            # print(start, 'to', stop)
-            # print(len(section))
+            print(start, 'to', stop)
+            print(len(section))
             for p_index, s in enumerate(section):
-                training_x[index][count] = s
+                dataset[count] = s
                 count += 1
                 # print(count)
                 if (s == len(section)):
                     count += buffer
 
         # print(list(filter(lambda x: x > 0.0, training_x[index])))
-        print(training_x[index])
-
-            # training_x[index][count] = 0.0
-            # training_x[index][count]
-            # count += 1
-            # if (p_index )
+        print(dataset)
 
         # training_x[index] = scipy.ndimage.filters.gaussian_filter1d(training_x[index], fwhm).astype(np.float16)
         # print(max(spectrum))
@@ -161,20 +159,18 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
         # print(kernel[0])
         # training_x[index] = scipy.signal.convolve(training_x[index], kernel, mode='same')
 
-        plt.plot(training_x[index])
+        plt.plot(dataset)
         plt.show()
         return
-        print(training_x[index])
-        # print(list(filter(lambda x: x > 0.0, training_x[index])))
-        # spectrum *= 1.0/spectrum.max()
-        # print(max(spectrum))
-        # print(kernel)
-        # print(spectrum)
 
         if i < num_training:
             print('train', i)
+            training_x[index] = dataset
+            training_y[index] = labels
         else:
             print('test', i - num_training)
+            testing_x[index] = dataset
+            testing_y[index] = labels
         print()
 
 
