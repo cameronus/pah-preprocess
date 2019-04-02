@@ -115,3 +115,6 @@ dmypy.json
 
 # Parsed PAHdb directory and files
 pahdb*
+
+# Dataset folder
+datasets

@@ -5,6 +5,7 @@ Cameron Jones, 2019
 
 import click
 import json
+import os
 import numpy as np
 import scipy.signal
 import matplotlib as mpl
@@ -49,7 +50,7 @@ POI = () # Points of interest
 def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_training, num_testing, wave_sigma, int_sigma, fwhm, resolution, buffer, poi, no_scale):
     # Get date, filename, and resolution multiplier
     now = datetime.datetime.now().strftime('%Y-%m-%d_%I-%M%p')
-    filename = f'_n{num_species}-m{mix_size}-p{len(poi)}_{now}.npy'
+    filename = f'_n{num_species}-m{mix_size}-p{len(poi)}_{now}'
     res_multipler = int(1/resolution) if resolution < 1 else 1
 
     # Print out dataset configuration
@@ -144,6 +145,7 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
             labels[uids.index(uid)] = 1.0
 
         print('UIDs in sample: [', ', '.join(map(str, [uids[i] for i in np.where(labels == 1.0)[0]])), ']')
+        print()
 
         # plt.plot(spectrum)
         # plt.show()
@@ -177,9 +179,9 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
         # print(kernel[0])
         # training_x[index] = scipy.signal.convolve(training_x[index], kernel, mode='same')
 
-        plt.plot(dataset)
-        plt.show()
-        return
+        # plt.plot(dataset)
+        # plt.show()
+        # return
 
         if i < num_training:
             training_x[index] = dataset
@@ -187,12 +189,16 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
         else:
             testing_x[index] = dataset
             testing_y[index] = labels
-        print()
-    # training_x
-    # training_y
-    # testing_x
-    # testing_y
 
+    # Create dataset directory if it doesn't exist
+    if not os.path.exists('datasets'):
+        os.makedirs('datasets')
+
+    # Save training and testing data
+    np.savez('datasets/training' + filename, x=training_x, y=training_y)
+    np.savez('datasets/testing' + filename, x=testing_x, y=testing_y)
+
+    print('Dataset saved successfully.')
 
 if __name__ == '__main__':
     generate_dataset()
