@@ -111,6 +111,7 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
 
     print('Length of data vector:', data_length)
 
+    # List out POIs
     for p_index, point in enumerate(poi):
         start = max(0, (point[0] - point[1]) * res_multipler)
         stop = min(vector_size - 1, (point[0] + point[1]) * res_multipler)
@@ -122,9 +123,11 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
     testing_x = np.zeros((num_testing, data_length), dtype=np.float32)
     testing_y = np.zeros((num_testing, len(uids)), dtype=np.float32)
 
+    # Loop through to generate each sample
     for i in range(num_training + num_testing):
         index = i if i < num_training else i - num_training
 
+        # Pick random spectra
         species = np.random.choice(data, mix_size, replace=False)
         spectrum = np.zeros((vector_size), dtype=np.float32)
 
@@ -135,17 +138,18 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
             print(f'Training Sample #{i + 1}')
         else:
             print(f'Testing Sample #{i - num_training + 1}')
+        print('UIDs in sample: [', ', '.join(map(str, [m['uid'] for m in species])), ']')
+        print()
 
+        # Add noise, normalize intensity, and generate labels
         for molecule in species:
             uid = molecule['uid']
             for transition in molecule['transitions']:
                 wavenumber = int(round(np.random.normal(0, wave_sigma) + transition[0], 1) * res_multipler)
                 intensity = (np.random.normal(0, int_sigma) + 1) * transition[1]
-                spectrum[wavenumber] += intensity / stats['intensity_max']
+                # spectrum[wavenumber] += intensity / stats['intensity_max']
+                spectrum[wavenumber] += intensity
             labels[uids.index(uid)] = 1.0
-
-        print('UIDs in sample: [', ', '.join(map(str, [uids[i] for i in np.where(labels == 1.0)[0]])), ']')
-        print()
 
         # plt.plot(spectrum)
         # plt.show()
@@ -153,11 +157,13 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
         # kernel = scipy.signal.gaussian(1001, std=fwhm)
         # spectrum = scipy.signal.convolve(spectrum, kernel, mode='same')
 
+        # Perform a Gaussian convolution on the whole spectrum
         spectrum = scipy.ndimage.filters.gaussian_filter1d(spectrum, fwhm).astype(np.float16)
 
         # plt.plot(spectrum)
         # plt.show()
 
+        # Cut spectra into POIs and rejoin with optional buffers
         count = 0
         for p_index, point in enumerate(poi):
             start = max(0, (point[0] - point[1]) * res_multipler)
@@ -169,20 +175,13 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
                 if (s_index == len(section) - 1 and p_index != len(poi) - 1):
                     count += buffer
 
-        # print(list(filter(lambda x: x > 0.0, training_x[index])))
-        # print(dataset)
-
-        # training_x[index] = scipy.ndimage.filters.gaussian_filter1d(training_x[index], fwhm).astype(np.float16)
-        # print(max(spectrum))
-
-        # kernel = scipy.signal.gaussian(1001, std=fwhm)
-        # print(kernel[0])
-        # training_x[index] = scipy.signal.convolve(training_x[index], kernel, mode='same')
+        # normalize again?
 
         # plt.plot(dataset)
         # plt.show()
         # return
 
+        # Insert final spectrum and labels into dataset matrix
         if i < num_training:
             training_x[index] = dataset
             training_y[index] = labels
@@ -202,48 +201,3 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
 
 if __name__ == '__main__':
     generate_dataset()
-
-"""
-mix_size: 2
-num species: 100
-poi: (200, 10) (1000, 10) (800, 40)
-5 training
-1 testing
-(equal concentrations, boolean species detection returned from CNN)
-
-outputted files:
-training_n100-m2-p3_2019-03-09_11-21PM.npy =>
-# setup 1
-[
-    [
-        [
-            [ sample 1 of poi 1 from molecule 1 ], # all poi 1 are same length
-            [ uids in sample 1 ]
-        ],
-        [
-            [ sample 2 of poi 1 from molecule 1 ],
-            [ uids in sample 2 ]
-        ]
-    ],
-    [
-
-    ],
- []  # poi 3
-]
-
-# setup 2
-[
-    [
-        [ sample 1 of poi 1 ], # all poi 1 are same length
-        [ sample 2 of poi 1 ]
-    ],
-    [
-
-    ],
-    [
-
-    ]
-]
-
-testing_n100-m2-p3_2019-03-09_11-21PM.npy =>
-"""
