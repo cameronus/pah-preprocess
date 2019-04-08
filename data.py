@@ -28,9 +28,12 @@ NUM_TESTING = 200 # Number of testing samples
 WAVE_SIGMA = 7.5 # Standard deviation of wavenumber noise
 INT_SIGMA = 0.2 # Standard deviation of intensity noise
 FWHM = 63.69 # 15cm^-1
-RESOLUTION = 0.1
-BUFFER = 0
+RESOLUTION = 0.1 # Resolution (in wavenumbers) of outputted spectrum
+BUFFER = 0 # Size of 0-padded space between POIs
 POI = () # Points of interest
+
+# major emission features at 3.3, 6.2, 7.7, 8.6, 11.2, 12.7, 16.4 μm
+# weaker features at 3.4, 3.5, 5.25, 5.75, 6.0, 6.9, 7.5, 10.5, 11.0, 13.5, 14.2, 17.4, 18.9 μm
 
 @click.command()
 @click.option('--input', '-i', default=DEFAULT_DB, help='PAHdb JSON input filename.')
@@ -47,7 +50,8 @@ POI = () # Points of interest
 @click.option('--buffer', default=BUFFER, help='0-padded buffer betweeen POIs.')
 @click.option('--poi', '-p', default=POI, type=(int, int), multiple=True, help='Points of interest and their width in cm^-1.')
 @click.option('--no_scale', is_flag=True, help='Do not apply the scaling factor to all wavenumbers.')
-def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_training, num_testing, wave_sigma, int_sigma, fwhm, resolution, buffer, poi, no_scale):
+@click.option('--debug', is_flag=True, help='Stop and display spectrum.')
+def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_training, num_testing, wave_sigma, int_sigma, fwhm, resolution, buffer, poi, no_scale, debug):
     # Get date, filename, and resolution multiplier
     now = datetime.datetime.now().strftime('%Y-%m-%d_%I-%M%p')
     filename = f'_n{num_species}-m{mix_size}-p{len(poi)}_{now}'
@@ -141,7 +145,7 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
         print('UIDs in sample: [', ', '.join(map(str, [m['uid'] for m in species])), ']')
         print()
 
-        # Add noise, normalize intensity, and generate labels
+        # Add noise, bin spectral intensity, and generate labels
         for molecule in species:
             uid = molecule['uid']
             for transition in molecule['transitions']:
@@ -151,17 +155,20 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
                 spectrum[wavenumber] += intensity
             labels[uids.index(uid)] = 1.0
 
-        # plt.plot(spectrum)
-        # plt.show()
+        if debug:
+            plt.plot(spectrum)
+            plt.show()
 
+        # Perform a Gaussian convolution on the whole spectrum
         # kernel = scipy.signal.gaussian(1001, std=fwhm)
         # spectrum = scipy.signal.convolve(spectrum, kernel, mode='same')
 
         # Perform a Gaussian convolution on the whole spectrum
         spectrum = scipy.ndimage.filters.gaussian_filter1d(spectrum, fwhm).astype(np.float16)
 
-        # plt.plot(spectrum)
-        # plt.show()
+        if debug:
+            plt.plot(spectrum)
+            plt.show()
 
         # Cut spectra into POIs and rejoin with optional buffers
         count = 0
@@ -177,9 +184,10 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
 
         # normalize again?
 
-        # plt.plot(dataset)
-        # plt.show()
-        # return
+        if debug:
+            plt.plot(dataset)
+            plt.show()
+            return
 
         # Insert final spectrum and labels into dataset matrix
         if i < num_training:
