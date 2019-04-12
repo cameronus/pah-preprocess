@@ -184,7 +184,7 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
     spectra = [[intensity / max_intensity for intensity in spectrum] for spectrum in spectra]
 
     if not debug:
-        bar = Bar('Slicing spectrum', max=num_training + num_testing)
+        bar = Bar('Slicing spectra', max=num_training + num_testing)
 
     # Chop spectrum into POIs
     for i in range(num_training + num_testing):
@@ -230,8 +230,8 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
         os.makedirs('datasets')
 
     # Save training and testing data
-    np.savez('datasets/training' + filename, x=training_x, y=training_y)
-    np.savez('datasets/testing' + filename, x=testing_x, y=testing_y)
+    np.savez('datasets/training' + filename, x=training_x, y=training_y, i_max=stats['intensity_max'], c_max=max_intensity)
+    np.savez('datasets/testing' + filename, x=testing_x, y=testing_y, i_max=stats['intensity_max'], c_max=max_intensity)
 
     print('Dataset saved successfully.')
 
