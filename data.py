@@ -22,8 +22,8 @@ VECTOR_SIZE = 6000 # All spectra should fit between 0 and VECTOR_SIZE wavenumber
 DEFAULT_DB = 'pahdb/pahdb-theoretical.json' # Database to pull molecules from
 CUTOFF = 100.0 # Max allowable intensity
 BLACKLIST = () # Blacklisted UIDs
-NUM_SPECIES = 1000 # Use the first NUM_SPECIES molecules to generate the dataset
-MIX_SIZE = 10 # Number of molecules to include in each synthetic mixture
+NUM_SPECIES = 100 # Use the first NUM_SPECIES molecules to generate the dataset
+MIX_SIZE = 5 # Number of molecules to include in each synthetic mixture
 NUM_TRAINING = 800 # Number of training samples
 NUM_TESTING = 200 # Number of testing samples
 WAVE_SIGMA = 7.5 # Standard deviation of wavenumber noise
@@ -32,7 +32,8 @@ FWHM = 63.69 # 15cm^-1
 RESOLUTION = 0.1 # Resolution (in wavenumbers) of outputted spectrum
 BUFFER = 50 # Size of 0-padded space between POIs
 # POI = () # Points of interest
-POI = ((3030.3, 150), (1612.9, 150), (1298.7, 150), (1162.8, 150), (892.9, 150), (787.4, 150), (609.8, 150))
+# POI = ((3030.3, 150), (1612.9, 150), (1298.7, 150), (1162.8, 150), (892.9, 150), (787.4, 150), (609.8, 150))
+POI = ((3030.3, 150), (1612.9, 150), (1298.7, 150))
 
 # major emission features at 3.3, 6.2, 7.7, 8.6, 11.2, 12.7, 16.4 μm
 # ((3030.3, 80), (1612.9, 80), (1298.7, 80), (1162.8, 80), (892.9, 80), (787.4, 80), (609.8, 80))
@@ -57,9 +58,7 @@ POI = ((3030.3, 150), (1612.9, 150), (1298.7, 150), (1162.8, 150), (892.9, 150),
 @click.option('--no_scale', is_flag=True, help='Do not apply the scaling factor to all wavenumbers.')
 @click.option('--debug', is_flag=True, help='Stop and display spectrum.')
 def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_training, num_testing, wave_sigma, int_sigma, fwhm, resolution, buffer, poi, minimize, no_scale, debug):
-    # Get date, filename, and resolution multiplier
-    now = datetime.datetime.now().strftime('%Y-%m-%d_%I-%M%p')
-    filename = f'_n{num_species}-m{mix_size}-p{len(poi)}_{now}'
+    # Get resolution multiplier
     res_multipler = int(1/resolution) if resolution < 1 else 1
 
     # Print out dataset configuration
@@ -142,9 +141,9 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
         species = np.random.choice(data, mix_size, replace=False)
 
         if i == 0:
-            print(f'Training ({num_training})')
+            print(f'\nTraining ({num_training})')
         elif i == num_training:
-            print(f'Testing ({num_testing})')
+            print(f'\nTesting ({num_testing})')
 
         print(f'Sample {str(i + 1 if i < num_training else i - num_training + 1).zfill(len(str(num_training + num_testing)))} ', end='')
         uids_in_mix = [m['uid'] for m in species]
@@ -229,11 +228,16 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
     if not os.path.exists('datasets'):
         os.makedirs('datasets')
 
+    now = datetime.datetime.now().strftime('%Y-%m-%d_%I-%M%p')
+    filename = f'_n{num_species}-m{mix_size}-p{len(poi)}_{now}'
+
     # Save training and testing data
     np.savez('datasets/training' + filename, x=training_x, y=training_y, i_max=stats['intensity_max'], c_max=max_intensity)
     np.savez('datasets/testing' + filename, x=testing_x, y=testing_y, i_max=stats['intensity_max'], c_max=max_intensity)
 
-    print('Dataset saved successfully.')
+    print('Dataset saved successfully:')
+    print('training' + filename + '.npz')
+    print('testing' + filename + '.npz')
 
 if __name__ == '__main__':
     generate_dataset()
