@@ -32,8 +32,8 @@ FWHM = 63.69 # 15cm^-1
 RESOLUTION = 0.1 # Resolution (in wavenumbers) of outputted spectrum
 BUFFER = 50 # Size of 0-padded space between POIs
 # POI = () # Points of interest
-# POI = ((3030.3, 150), (1612.9, 150), (1298.7, 150), (1162.8, 150), (892.9, 150), (787.4, 150), (609.8, 150))
-POI = ((3030.3, 150), (1612.9, 150), (1298.7, 150))
+POI = ((3030.3, 150), (1612.9, 150), (1298.7, 150), (1162.8, 150), (892.9, 150), (787.4, 150), (609.8, 150))
+# POI = ((3030.3, 150), (1612.9, 150), (1298.7, 150))
 
 # major emission features at 3.3, 6.2, 7.7, 8.6, 11.2, 12.7, 16.4 μm
 # ((3030.3, 80), (1612.9, 80), (1298.7, 80), (1162.8, 80), (892.9, 80), (787.4, 80), (609.8, 80))
@@ -69,12 +69,12 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
     if len(poi) == 0:
         print('No POIs. Exiting.')
         return
-    print('Importing PAHdb.')
+    print()
 
     # Open and parse PAHdb JSON file
+    print('Importing PAHdb.')
     with open(input) as file:
         db = json.loads(file.read())
-    uids = db['uids']
     data = db['data']
     print(len(data), 'initial molecules.')
 
@@ -96,6 +96,10 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
     # Get first num_species molecules from data
     data = data[:num_species]
     print(len(data), 'molecules after slicing.')
+    print()
+
+    # Final list of uids in data
+    uids = [molecule['uid'] for molecule in data]
 
     # Calculate bounds
     get_bounds = lambda part: [transition[part] for molecule in data for transition in molecule['transitions']]
@@ -117,7 +121,8 @@ def generate_dataset(input, cutoff, blacklist, num_species, mix_size, num_traini
     buffer *= res_multipler
     data_length = poi_length + buffer * (len(poi) - 1)
 
-    print('Length of data vector:', data_length)
+    print('Length of sample vector:', data_length)
+    print('Length of label vector:', len(uids))
 
     # List out POIs
     for p_index, point in enumerate(poi):
